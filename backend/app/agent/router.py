@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -60,6 +62,45 @@ def poll_issues(db: Session = Depends(get_db)):
                 for c in (issue.comments or [])
             ],
         ))
+    return result
+
+
+@router.get("/unreplied")
+def unreplied_comments(db: Session = Depends(get_db)):
+    """Find issues where the last comment is from a user with no agent reply."""
+    issues = db.query(Issue).filter(
+        Issue.status != "deleted"
+    ).all()
+
+    result = []
+    for issue in issues:
+        comments = issue.comments or []
+        if not comments:
+            continue
+        sorted_comments = sorted(comments, key=lambda c: c.created_at or datetime.min)
+        last_comment = sorted_comments[-1]
+        if last_comment.author_type == "user":
+            last_agent_time = datetime.min
+            for c in sorted_comments:
+                if c.author_type == "agent" and c.created_at and c.created_at > last_agent_time:
+                    last_agent_time = c.created_at
+            user_comments_needing_reply = []
+            for c in sorted_comments:
+                if c.author_type == "user" and c.created_at and c.created_at > last_agent_time:
+                    user_comments_needing_reply.append({
+                        "id": c.id,
+                        "body": c.body,
+                        "created_at": str(c.created_at) if c.created_at else None,
+                    })
+            if user_comments_needing_reply:
+                result.append({
+                    "issue_id": issue.id,
+                    "issue_title": issue.title,
+                    "issue_status": issue.status,
+                    "script_path": issue.script_path,
+                    "priority": issue.priority,
+                    "unreplied_comments": user_comments_needing_reply,
+                })
     return result
 
 
