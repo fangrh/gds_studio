@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/fangrh/gds_studio/frontend:staging
+          image: gds-collab-frontend:latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 80
 ---
