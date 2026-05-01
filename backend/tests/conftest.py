@@ -1,19 +1,21 @@
 import os
 import pytest
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 os.environ["GDS_COLLAB_DB"] = ":memory:"
 
 from app.db import Base, get_db
 from app.main import app
 
-_test_engine = create_engine(
+test_engine = create_engine(
     "sqlite:///:memory:",
     connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
-_TestSession = sessionmaker(autocommit=False, autoflush=False, bind=_test_engine)
+_TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
 def _override_get_db():
@@ -29,9 +31,9 @@ app.dependency_overrides[get_db] = _override_get_db
 
 @pytest.fixture(autouse=True)
 def setup_tables():
-    Base.metadata.create_all(bind=_test_engine)
+    Base.metadata.create_all(bind=test_engine)
     yield
-    Base.metadata.drop_all(bind=_test_engine)
+    Base.metadata.drop_all(bind=test_engine)
 
 
 @pytest.fixture
