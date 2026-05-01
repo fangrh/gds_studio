@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.gds.router import router as gds_router
 from app.issues.router import issue_router, comment_router
 from app.wiki.router import router as wiki_router
+from app.agent.router import router as agent_router
 
 app = FastAPI(title="GDS Collab Platform", version="0.1.0")
 
@@ -18,6 +19,7 @@ app.include_router(gds_router)
 app.include_router(issue_router)
 app.include_router(comment_router)
 app.include_router(wiki_router)
+app.include_router(agent_router)
 
 
 @app.get("/api/health")
