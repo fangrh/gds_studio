@@ -5,19 +5,40 @@ on:
     branches: [main]
 
 jobs:
-  deploy-staging:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push backend
-        run: |
-          docker build -t localhost:5000/gds-collab-backend:staging ./backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:staging
+            ghcr.io/${{ github.repository }}/backend:sha-${{ github.sha }}
 
       - name: Build and push frontend
-        run: |
-          docker build -t localhost:5000/gds-collab-frontend:staging ./frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend:staging
+            ghcr.io/${{ github.repository }}/frontend:sha-${{ github.sha }}
 
-      - name: Deploy to k3s staging
+      - name: Update staging manifest
         run: |
-          echo "Deploying to staging..."
+          echo "Images pushed. Argo CD will auto-detect changes from the k8s/ directory."

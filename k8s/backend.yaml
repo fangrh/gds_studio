@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: gds-collab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/fangrh/gds_studio/backend:staging
+          ports:
+            - containerPort: 8000
+          env:
+            - name: GDS_COLLAB_DB
+              value: /data/db/gds_collab.db
+          volumeMounts:
+            - name: db
+              mountPath: /data/db
+            - name: scripts
+              mountPath: /data/scripts
+              readOnly: true
+            - name: gds
+              mountPath: /data/gds
+      volumes:
+        - name: db
+          persistentVolumeClaim:
+            claimName: db-pvc
+        - name: scripts
+          persistentVolumeClaim:
+            claimName: scripts-pvc
+        - name: gds
+          persistentVolumeClaim:
+            claimName: gds-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: gds-collab
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
