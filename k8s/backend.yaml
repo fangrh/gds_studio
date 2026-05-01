@@ -22,6 +22,8 @@ spec:
           env:
             - name: GDS_COLLAB_DB
               value: /data/db/gds_collab.db
+            - name: GDS_PROJECTS_DIR
+              value: /data/projects
           volumeMounts:
             - name: db
               mountPath: /data/db
@@ -30,6 +32,8 @@ spec:
               readOnly: true
             - name: gds
               mountPath: /data/gds
+            - name: projects
+              mountPath: /data/projects
       volumes:
         - name: db
           persistentVolumeClaim:
@@ -40,6 +44,9 @@ spec:
         - name: gds
           persistentVolumeClaim:
             claimName: gds-pvc
+        - name: projects
+          persistentVolumeClaim:
+            claimName: projects-pvc
 ---
 apiVersion: v1
 kind: Service

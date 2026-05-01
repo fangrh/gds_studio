@@ -10,6 +10,7 @@ class ElementData:
     element_type: str  # "polygon", "box", "path", "text", "reference"
     layer: str  # "1/0" format
     bbox: str  # "x1,y1,x2,y2" in DBU
+    vertices: list[list[float]] = field(default_factory=list)
     path_data: str = ""
     properties: dict = field(default_factory=dict)
     source_line: Optional[int] = None
@@ -81,17 +82,29 @@ def parse_gds(gds_path: str) -> GdsParseResult:
 
             for shape in shapes.each():
                 if shape.is_box():
+                    box = shape.dbbox()
                     el = ElementData(
                         element_type="box",
                         layer=_layer_str(li, layout),
-                        bbox=_bbox_str(shape.dbbox()),
+                        bbox=_bbox_str(box),
+                        vertices=[
+                            [box.left, box.bottom],
+                            [box.right, box.bottom],
+                            [box.right, box.top],
+                            [box.left, box.top],
+                        ],
                     )
                     cell_data.elements.append(el)
                 elif shape.is_polygon():
+                    poly = shape.polygon
+                    verts = []
+                    for p in poly.each_point_hull():
+                        verts.append([p.x * layout.dbu, p.y * layout.dbu])
                     el = ElementData(
                         element_type="polygon",
                         layer=_layer_str(li, layout),
                         bbox=_bbox_str(shape.dbbox()),
+                        vertices=verts,
                     )
                     cell_data.elements.append(el)
                 elif shape.is_path():

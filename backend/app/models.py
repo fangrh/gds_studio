@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Float, DateTime, ForeignKey,
-    JSON, and_, Enum as SAEnum,
+    JSON, and_, Enum as SAEnum, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship, foreign
 from app.db import Base
@@ -9,6 +9,22 @@ from app.db import Base
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), unique=True, nullable=False)
+    description = Column(Text, default="")
+    token_hash = Column(String(64), unique=True, nullable=False)
+    last_sync_at = Column(DateTime)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    issues = relationship("Issue", back_populates="project")
+    wiki_pages = relationship("WikiPage", back_populates="project")
+    scripts = relationship("GdsScript", back_populates="project")
 
 
 class User(Base):
@@ -25,13 +41,15 @@ class GdsScript(Base):
     __tablename__ = "gds_scripts"
 
     id = Column(Integer, primary_key=True)
-    path = Column(String(500), unique=True, nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), default=1)
+    path = Column(String(500), nullable=False)
     name = Column(String(200), nullable=False)
     description = Column(Text, default="")
     params_json = Column(JSON, default=dict)
     last_modified = Column(DateTime, default=utcnow)
     git_commit = Column(String(40))
 
+    project = relationship("Project", back_populates="scripts")
     builds = relationship("GdsBuild", back_populates="script", order_by="GdsBuild.created_at.desc()")
 
 
@@ -40,6 +58,7 @@ class GdsBuild(Base):
 
     id = Column(Integer, primary_key=True)
     script_id = Column(Integer, ForeignKey("gds_scripts.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), default=1)
     gds_path = Column(String(500), nullable=False)
     status = Column(String(20), default="pending")  # pending, success, failed
     build_log = Column(Text, default="")
@@ -93,12 +112,14 @@ class Issue(Base):
     author_id = Column(Integer, default=1)
     priority = Column(String(10), default="normal")
     tags = Column(JSON, default=list)
+    project_id = Column(Integer, ForeignKey("projects.id"), default=1)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     resolved_by = Column(String(50))
     resolved_at = Column(DateTime)
     script_path = Column(String(500))
 
+    project = relationship("Project", back_populates="issues")
     linked_elements = relationship("IssueElement", back_populates="issue")
     comments = relationship(
         "Comment",
@@ -127,18 +148,24 @@ class IssueElement(Base):
 
 class WikiPage(Base):
     __tablename__ = "wiki_pages"
+    __table_args__ = (
+        UniqueConstraint("slug", "project_id", name="uq_wiki_slug_project"),
+    )
 
     id = Column(Integer, primary_key=True)
     title = Column(String(500), nullable=False)
-    slug = Column(String(200), unique=True, nullable=False)
+    slug = Column(String(200), nullable=False)
     body = Column(Text, default="")
     category = Column(String(100), default="general")
     tags = Column(JSON, default=list)
     version = Column(Integer, default=1)
     last_editor_type = Column(String(20), default="user")
     last_editor_id = Column(Integer, default=1)
+    project_id = Column(Integer, ForeignKey("projects.id"), default=1)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    project = relationship("Project", back_populates="wiki_pages")
 
 
 class Comment(Base):

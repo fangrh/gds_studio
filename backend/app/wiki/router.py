@@ -14,11 +14,14 @@ router = APIRouter(prefix="/api/wiki", tags=["wiki"])
 @router.get("", response_model=list[WikiPageListResponse])
 def list_wiki_pages(
     category: Optional[str] = Query(None),
+    project_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
     q = db.query(WikiPage)
     if category:
         q = q.filter(WikiPage.category == category)
+    if project_id:
+        q = q.filter(WikiPage.project_id == project_id)
     return q.order_by(WikiPage.updated_at.desc()).all()
 
 
@@ -34,6 +37,7 @@ def create_wiki_page(data: WikiPageCreate, db: Session = Depends(get_db)):
         category=data.category,
         tags=data.tags,
         version=1,
+        project_id=data.project_id if data.project_id else 1,
     )
     db.add(page)
     db.commit()

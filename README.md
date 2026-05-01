@@ -25,6 +25,24 @@ make dev-frontend
 
 Open http://localhost:3000.
 
+### Without `make` (Windows / no Makefile)
+
+```bash
+# Install dependencies
+cd backend && pip install -r requirements.txt
+cd ../frontend && npm install
+cd ../agent-skill && pip install -e .
+
+# Run backend (terminal 1)
+cd backend && uvicorn app.main:app --reload --port 8000
+
+# Run frontend (terminal 2)
+cd frontend && npm run dev
+
+# Run tests
+cd backend && python -m pytest -v
+```
+
 ### Docker Compose
 
 ```bash

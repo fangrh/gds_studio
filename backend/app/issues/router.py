@@ -24,6 +24,7 @@ def _issue_to_response(issue: Issue) -> IssueResponse:
         author_id=issue.author_id,
         priority=issue.priority,
         tags=issue.tags or [],
+        project_id=issue.project_id,
         created_at=issue.created_at,
         updated_at=issue.updated_at,
         resolved_by=issue.resolved_by,
@@ -66,11 +67,14 @@ def _issue_to_response(issue: Issue) -> IssueResponse:
 @issue_router.get("", response_model=list[IssueResponse])
 def list_issues(
     status: Optional[str] = Query(None),
+    project_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
     q = db.query(Issue)
     if status:
         q = q.filter(Issue.status == status)
+    if project_id:
+        q = q.filter(Issue.project_id == project_id)
     return [_issue_to_response(i) for i in q.order_by(Issue.created_at.desc()).all()]
 
 
@@ -82,6 +86,7 @@ def create_issue(data: IssueCreate, db: Session = Depends(get_db)):
         priority=data.priority,
         tags=data.tags,
         script_path=data.script_path,
+        project_id=data.project_id if hasattr(data, 'project_id') and data.project_id else 1,
     )
     db.add(issue)
     db.flush()

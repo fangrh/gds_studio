@@ -25,14 +25,15 @@ def register_session(data: AgentSessionCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/poll", response_model=list[PollIssueResponse])
-def poll_issues(db: Session = Depends(get_db)):
+def poll_issues(
+    project_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+):
     """Return all open (unclaimed) issues."""
-    issues = (
-        db.query(Issue)
-        .filter(Issue.status == "open")
-        .order_by(Issue.created_at.desc())
-        .all()
-    )
+    q = db.query(Issue).filter(Issue.status == "open")
+    if project_id:
+        q = q.filter(Issue.project_id == project_id)
+    issues = q.order_by(Issue.created_at.desc()).all()
     result = []
     for issue in issues:
         result.append(PollIssueResponse(

@@ -9,6 +9,7 @@ class WikiPageCreate(BaseModel):
     body: str = ""
     category: str = "general"
     tags: list[str] = []
+    project_id: Optional[int] = None
 
 
 class WikiPageUpdate(BaseModel):

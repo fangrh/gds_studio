@@ -53,6 +53,7 @@ class IssueCreate(BaseModel):
     priority: str = "normal"
     tags: list[str] = []
     script_path: Optional[str] = None
+    project_id: Optional[int] = None
     linked_elements: list[IssueElementLink] = []
 
 
@@ -73,6 +74,7 @@ class IssueResponse(BaseModel):
     author_id: Optional[int] = None
     priority: str
     tags: list = []
+    project_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     resolved_by: Optional[str] = None

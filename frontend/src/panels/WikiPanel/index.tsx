@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useOutletContext } from 'react-router-dom';
 import CommentThread from '../../components/CommentThread';
 
 interface WikiPage {
@@ -25,6 +25,8 @@ interface WikiListEntry {
 
 function WikiPanel() {
   const { slug } = useParams<{ slug: string }>();
+  const outletContext = useOutletContext<{ projectId?: number } | null>();
+  const projectId = outletContext?.projectId;
   const [pages, setPages] = useState<WikiListEntry[]>([]);
   const [page, setPage] = useState<WikiPage | null>(null);
   const [commentBody, setCommentBody] = useState('');
@@ -32,11 +34,11 @@ function WikiPanel() {
   const [showNewForm, setShowNewForm] = useState(false);
 
   useEffect(() => {
-    const url = categoryFilter
-      ? `/api/wiki?category=${encodeURIComponent(categoryFilter)}`
-      : '/api/wiki';
-    fetch(url).then(r => r.json()).then(setPages);
-  }, [categoryFilter]);
+    const params = new URLSearchParams();
+    if (categoryFilter) params.set('category', categoryFilter);
+    if (projectId) params.set('project_id', String(projectId));
+    fetch(`/api/wiki?${params}`).then(r => r.json()).then(setPages);
+  }, [categoryFilter, projectId]);
 
   useEffect(() => {
     if (slug) {
@@ -93,7 +95,7 @@ function WikiPanel() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
-          <Link to="/wiki" style={{ fontSize: '13px', color: '#666' }}>&larr; Back to wiki</Link>
+          <Link to={projectId ? `/projects/${projectId}/wiki` : '/wiki'} style={{ fontSize: '13px', color: '#666' }}>&larr; Back to wiki</Link>
           <h2 style={{ marginTop: '8px' }}>{page.title}</h2>
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
             <span style={{ fontSize: '12px', color: '#666' }}>v{page.version}</span>
@@ -195,7 +197,7 @@ function WikiPanel() {
         {pages.map(p => (
           <Link
             key={p.id}
-            to={`/wiki/${p.slug}`}
+            to={projectId ? `/projects/${projectId}/wiki/${p.slug}` : `/wiki/${p.slug}`}
             style={{ textDecoration: 'none', color: 'inherit' }}
           >
             <div style={{
