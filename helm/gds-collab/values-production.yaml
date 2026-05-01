@@ -1,0 +1,17 @@
+image:
+  tag: production
+
+replicaCount: 2
+
+backend:
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+
+ingress:
+  host: gds-collab.local
+  tls: true

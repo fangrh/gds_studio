@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Build backend
+        run: docker build -t localhost:5000/gds-collab-backend:${{ env.VERSION }} ./backend
+
+      - name: Build frontend
+        run: docker build -t localhost:5000/gds-collab-frontend:${{ env.VERSION }} ./frontend
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying version ${{ env.VERSION }} to production..."

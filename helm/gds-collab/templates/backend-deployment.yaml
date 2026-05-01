@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-backend
+  labels:
+    app: {{ .Release.Name }}-backend
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-backend
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.image.repository }}-backend:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+          env:
+            - name: GDS_COLLAB_DB
+              value: {{ .Values.backend.dbPath }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /data/scripts
+            - name: gds
+              mountPath: /data/gds
+            - name: db
+              mountPath: /data/db
+      volumes:
+        - name: scripts
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-scripts-pvc
+        - name: gds
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-gds-pvc
+        - name: db
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-backend
+spec:
+  selector:
+    app: {{ .Release.Name }}-backend
+  ports:
+    - port: {{ .Values.backend.port }}
+      targetPort: {{ .Values.backend.port }}

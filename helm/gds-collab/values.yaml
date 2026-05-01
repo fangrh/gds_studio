@@ -1,0 +1,42 @@
+replicaCount: 1
+
+image:
+  repository: localhost:5000/gds-collab
+  tag: latest
+
+backend:
+  port: 8000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  dbPath: /data/db/gds_collab.db
+
+frontend:
+  port: 80
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+persistence:
+  scripts:
+    size: 10Gi
+    path: /data/scripts
+  gds:
+    size: 50Gi
+    path: /data/gds
+  db:
+    size: 5Gi
+    path: /data/db
+
+ingress:
+  enabled: true
+  host: gds-collab.local
+  tls: false

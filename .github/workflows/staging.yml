@@ -1,0 +1,23 @@
+name: Staging Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push backend
+        run: |
+          docker build -t localhost:5000/gds-collab-backend:staging ./backend
+
+      - name: Build and push frontend
+        run: |
+          docker build -t localhost:5000/gds-collab-frontend:staging ./frontend
+
+      - name: Deploy to k3s staging
+        run: |
+          echo "Deploying to staging..."

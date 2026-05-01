@@ -1,0 +1,5 @@
+image:
+  tag: staging
+
+ingress:
+  host: gds-collab-staging.local

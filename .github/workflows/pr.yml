@@ -1,0 +1,67 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend deps
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Lint backend
+        run: |
+          pip install ruff
+          ruff check backend/
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          python -m pytest -v
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend deps
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Lint frontend
+        run: |
+          cd frontend
+          npx tsc --noEmit
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+  build-and-deploy-staging:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t gds-collab-backend:staging ./backend
+
+      - name: Build frontend image
+        run: docker build -t gds-collab-frontend:staging ./frontend
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to k3s staging namespace..."

@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gds-build
+spec:
+  entrypoint: build-gds
+  arguments:
+    parameters:
+      - name: script-path
+      - name: output-path
+      - name: git-commit
+  templates:
+    - name: build-gds
+      container:
+        image: localhost:5000/gds-collab-backend:latest
+        command: [python]
+        args:
+          - -c
+          - |
+            import subprocess, sys
+            script = "{{inputs.parameters.script-path}}"
+            output = "{{inputs.parameters.output-path}}"
+            commit = "{{inputs.parameters.git-commit}}"
+            print(f"Building GDS from {script} at {commit}")
+            subprocess.run([sys.executable, script], check=True)
+            print(f"Build complete: {output}")
+        volumeMounts:
+          - name: scripts
+            mountPath: /data/scripts
+          - name: gds
+            mountPath: /data/gds
+      volumes:
+        - name: scripts
+          persistentVolumeClaim:
+            claimName: gds-collab-scripts-pvc
+        - name: gds
+          persistentVolumeClaim:
+            claimName: gds-collab-gds-pvc

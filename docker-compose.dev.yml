@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./data/scripts:/data/scripts:ro
+      - ./data/gds:/data/gds
+      - db_data:/data/db
+    environment:
+      - GDS_COLLAB_DB=/data/db/gds_collab.db
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: agent-task
+spec:
+  entrypoint: process-issue
+  arguments:
+    parameters:
+      - name: issue-id
+      - name: session-id
+      - name: agent-type
+  templates:
+    - name: process-issue
+      steps:
+        - - name: poll-context
+            template: fetch-context
+        - - name: run-agent
+            template: agent-fix
+        - - name: rebuild-gds
+            template: trigger-build
+        - - name: post-response
+            template: resolve-issue
+
+    - name: fetch-context
+      container:
+        image: localhost:5000/gds-collab-backend:latest
+        command: [python]
+        args:
+          - -c
+          - |
+            import httpx
+            r = httpx.get(f"http://backend:8000/api/issues/{{inputs.parameters.issue-id}}")
+            print(r.json())
+
+    - name: agent-fix
+      container:
+        image: localhost:5000/gds-collab-backend:latest
+        command: [echo]
+        args: ["Agent would modify scripts here"]
+
+    - name: trigger-build
+      container:
+        image: localhost:5000/gds-collab-backend:latest
+        command: [echo]
+        args: ["Build triggered"]
+
+    - name: resolve-issue
+      container:
+        image: localhost:5000/gds-collab-backend:latest
+        command: [echo]
+        args: ["Issue resolved"]
