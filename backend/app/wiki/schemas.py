@@ -29,6 +29,7 @@ class WikiPageResponse(BaseModel):
     version: int
     last_editor_type: str
     last_editor_id: Optional[int] = None
+    project_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -43,6 +44,7 @@ class WikiPageListResponse(BaseModel):
     category: str
     tags: list = []
     version: int
+    project_id: Optional[int] = None
     updated_at: Optional[datetime] = None
 
     class Config:
