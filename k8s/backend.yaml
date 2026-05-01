@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: gds-collab-backend:latest
-          imagePullPolicy: Never
+          image: ghcr.io/fangrh/gds_studio/backend:staging
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
