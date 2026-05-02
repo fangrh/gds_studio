@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: agent-skill
-          image: ghcr.io/fangrh/gds_studio/agent-skill:sha-76f5279188bda1249a763407682e3764cefac229
+          image: ghcr.io/fangrh/gds_studio/agent-skill:sha-8b0755bcf703bb9ecc36e5dc7ae77736aae98303
           imagePullPolicy: Always
           env:
             - name: GDS_COLLAB_API

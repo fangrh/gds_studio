@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/fangrh/gds_studio/backend:sha-76f5279188bda1249a763407682e3764cefac229
+          image: ghcr.io/fangrh/gds_studio/backend:sha-8b0755bcf703bb9ecc36e5dc7ae77736aae98303
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
