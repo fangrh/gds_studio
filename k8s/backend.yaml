@@ -22,6 +22,8 @@ spec:
           env:
             - name: GDS_COLLAB_DB
               value: /data/db/gds_collab.db
+            - name: GDS_DIR
+              value: /data/gds
             - name: GDS_PROJECTS_DIR
               value: /data/projects
           resources:
