@@ -29,6 +29,12 @@ def get_db():
         db.close()
 
 
+def init_db():
+    """Create all tables from SQLAlchemy models."""
+    from app.models import Base as ModelsBase
+    ModelsBase.metadata.create_all(bind=engine)
+
+
 def run_migrations():
     """Add projects table and project_id FK to existing tables."""
     with engine.connect() as conn:

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.db import run_migrations
+from app.db import init_db, run_migrations
 from app.gds.router import router as gds_router
 from app.issues.router import issue_router, comment_router
 from app.wiki.router import router as wiki_router
@@ -13,11 +13,12 @@ app = FastAPI(title="GDS Collab Platform", version="0.2.0")
 
 @app.on_event("startup")
 def startup():
+    init_db()
     run_migrations()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
