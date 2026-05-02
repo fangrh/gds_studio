@@ -4,7 +4,7 @@ metadata:
   name: agent-skill
   namespace: gds-collab
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: agent-skill
@@ -26,11 +26,6 @@ spec:
               value: /data/gds
             - name: POLL_INTERVAL
               value: "30"
-            - name: ANTHROPIC_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: agent-secrets
-                  key: anthropic-api-key
           resources:
             requests:
               memory: "128Mi"
