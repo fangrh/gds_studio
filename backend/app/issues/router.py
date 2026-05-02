@@ -68,6 +68,8 @@ def _issue_to_response(issue: Issue) -> IssueResponse:
 def list_issues(
     status: Optional[str] = Query(None),
     project_id: Optional[int] = Query(None),
+    element_id: Optional[int] = Query(None),
+    cell_name: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     q = db.query(Issue)
@@ -75,6 +77,12 @@ def list_issues(
         q = q.filter(Issue.status == status)
     if project_id:
         q = q.filter(Issue.project_id == project_id)
+    if element_id is not None:
+        q = q.join(IssueElement, IssueElement.issue_id == Issue.id).filter(
+            IssueElement.element_id == element_id
+        )
+        if cell_name:
+            q = q.filter(IssueElement.cell_name == cell_name)
     return [_issue_to_response(i) for i in q.order_by(Issue.created_at.desc()).all()]
 
 

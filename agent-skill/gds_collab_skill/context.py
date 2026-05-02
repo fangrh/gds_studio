@@ -27,6 +27,20 @@ def build_issue_context(client: GdsCollabClient, issue_id: int) -> str:
             )
             if el.get("deep_link_url"):
                 parts.append(f"  Deep link: {el['deep_link_url']}")
+
+            # Include source context if available via the source endpoint
+            source_line = el.get("source_script_line")
+            script_path = issue.get("script_path")
+            if source_line and script_path:
+                try:
+                    snippet = client.get_source_context(script_path, source_line)
+                    if snippet:
+                        parts.append(f"  **Source context (line {source_line}):**")
+                        for line in snippet.get("snippet", []):
+                            marker = ">>>" if line.get("highlighted") else "   "
+                            parts.append(f"    {marker} {line['num']:>4} | {line['text']}")
+                except Exception:
+                    pass
         parts.append("")
 
     comments = issue.get("comments", [])

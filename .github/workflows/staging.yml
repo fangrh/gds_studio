@@ -7,8 +7,9 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -39,16 +40,25 @@ jobs:
             ghcr.io/${{ github.repository }}/frontend:staging
             ghcr.io/${{ github.repository }}/frontend:sha-${{ github.sha }}
 
+      - name: Build and push agent-skill
+        uses: docker/build-push-action@v6
+        with:
+          context: ./agent-skill
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/agent-skill:staging
+            ghcr.io/${{ github.repository }}/agent-skill:sha-${{ github.sha }}
+
       - name: Update k8s manifests with new SHA tag
         run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          sed -i "s|ghcr.io/${{ github.repository }}/backend:staging|ghcr.io/${{ github.repository }}/backend:sha-${{ github.sha }}|" k8s/backend.yaml
-          sed -i "s|ghcr.io/${{ github.repository }}/frontend:staging|ghcr.io/${{ github.repository }}/frontend:sha-${{ github.sha }}|" k8s/frontend.yaml
+          sed -i "s|ghcr.io/${{ github.repository }}/backend:.*|ghcr.io/${{ github.repository }}/backend:sha-${{ github.sha }}|" k8s/backend.yaml
+          sed -i "s|ghcr.io/${{ github.repository }}/frontend:.*|ghcr.io/${{ github.repository }}/frontend:sha-${{ github.sha }}|" k8s/frontend.yaml
+          sed -i "s|ghcr.io/${{ github.repository }}/agent-skill:.*|ghcr.io/${{ github.repository }}/agent-skill:sha-${{ github.sha }}|" k8s/agent-skill.yaml
 
       - name: Commit updated manifests
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/backend.yaml k8s/frontend.yaml
+          git add k8s/backend.yaml k8s/frontend.yaml k8s/agent-skill.yaml
           git diff --cached --quiet || git commit -m "deploy: update image tags to sha-${{ github.sha }}"
           git push

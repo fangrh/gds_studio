@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Map from 'ol/Map';
 import View from 'ol/View';
@@ -7,6 +7,7 @@ import VectorSource from 'ol/source/Vector';
 import { Style, Fill, Stroke } from 'ol/style';
 import { Polygon } from 'ol/geom';
 import Feature from 'ol/Feature';
+import ElementDrawer from '../ElementDrawer';
 
 interface LayerInfo {
   layer: number;
@@ -17,7 +18,9 @@ interface GeometryData {
   name: string;
   bbox: { left: number; bottom: number; right: number; top: number };
   layers: Record<string, LayerInfo>;
-  elements: { type: string; layer: string; vertices: number[][] }[];
+  elements: { type: string; layer: string; vertices: number[][]; source_line?: number; source_call?: string }[];
+  build_id?: number;
+  script_path?: string;
 }
 
 interface GdsFile {
@@ -43,6 +46,18 @@ function getStyle(layer: string): Style {
 
 const HIDDEN_STYLE = new Style({});
 
+const HIGHLIGHT_STYLE = new Style({
+  fill: new Fill({ color: 'rgba(0, 229, 255, 0.15)' }),
+  stroke: new Stroke({ color: '#00e5ff', width: 2.5 }),
+});
+
+export interface SelectedElement {
+  index: number;
+  layer: string;
+  sourceLine: number | null;
+  sourceCall: string | null;
+}
+
 function GdsViewer() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -53,6 +68,19 @@ function GdsViewer() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [files, setFiles] = useState<GdsFile[]>([]);
+  const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [geometryData, setGeometryData] = useState<GeometryData | null>(null);
+  const [scriptPath, setScriptPath] = useState<string | null>(null);
+  const selectedFeatureRef = useRef<Feature | null>(null);
+  const selectedElementRef = useRef<SelectedElement | null>(null);
+  const drawerOpenRef = useRef(false);
+  const geometryDataRef = useRef<GeometryData | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => { selectedElementRef.current = selectedElement; }, [selectedElement]);
+  useEffect(() => { drawerOpenRef.current = drawerOpen; }, [drawerOpen]);
+  useEffect(() => { geometryDataRef.current = geometryData; }, [geometryData]);
 
   const gds = searchParams.get('gds') || '';
 
@@ -88,11 +116,68 @@ function GdsViewer() {
       }
     });
 
+    map.on('singleclick', (evt) => {
+      const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f) as Feature | undefined;
+      if (!feature) {
+        // Click on empty canvas — deselect
+        if (selectedFeatureRef.current) {
+          const origLayer = selectedFeatureRef.current.get('layer');
+          selectedFeatureRef.current.setStyle(getStyle(origLayer));
+        }
+        selectedFeatureRef.current = null;
+        setSelectedElement(null);
+        setDrawerOpen(false);
+        return;
+      }
+
+      const idx = feature.get('index') as number;
+      const layer = feature.get('layer') as string;
+
+      // Click same element — toggle closed
+      if (selectedElementRef.current && selectedElementRef.current.index === idx && drawerOpenRef.current) {
+        if (selectedFeatureRef.current) {
+          selectedFeatureRef.current.setStyle(getStyle(selectedFeatureRef.current.get('layer')));
+        }
+        selectedFeatureRef.current = null;
+        setSelectedElement(null);
+        setDrawerOpen(false);
+        return;
+      }
+
+      // Deselect previous
+      if (selectedFeatureRef.current) {
+        selectedFeatureRef.current.setStyle(getStyle(selectedFeatureRef.current.get('layer')));
+      }
+
+      // Select new
+      feature.setStyle(HIGHLIGHT_STYLE);
+      selectedFeatureRef.current = feature;
+
+      // Look up source metadata from geometry data
+      const geoEl = geometryDataRef.current?.elements[idx];
+      setSelectedElement({
+        index: idx,
+        layer,
+        sourceLine: geoEl?.source_line ?? null,
+        sourceCall: geoEl?.source_call ?? null,
+      });
+      setDrawerOpen(true);
+    });
+
     return () => {
       map.setTarget(undefined);
       mapObjRef.current = null;
     };
   }, []);
+
+  // Resize map when drawer opens/closes
+  useEffect(() => {
+    if (mapObjRef.current) {
+      requestAnimationFrame(() => {
+        mapObjRef.current?.updateSize();
+      });
+    }
+  }, [drawerOpen]);
 
   // Load and render GDS geometry
   useEffect(() => {
@@ -105,6 +190,9 @@ function GdsViewer() {
         const res = await fetch(`/api/gds/geometry/${gds}`);
         if (!res.ok) throw new Error(`Failed to load: ${res.status}`);
         const data: GeometryData = await res.json();
+
+        setGeometryData(data);
+        setScriptPath(data.script_path ?? null);
 
         const source = new VectorSource();
         data.elements.forEach((el, i) => {
@@ -160,7 +248,7 @@ function GdsViewer() {
       if (layer instanceof VectorLayer) {
         const source = layer.getSource();
         if (source) {
-          source.forEachFeature((f) => {
+          source.forEachFeature((f: Feature) => {
             const fLayer = f.get('layer');
             const layerState = newLayers.find((l) => l.name === fLayer);
             if (layerState) {
@@ -221,10 +309,10 @@ function GdsViewer() {
           </>
         )}
       </div>
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div
           ref={mapRef}
-          style={{ width: '100%', height: '100%', background: '#1a1a2e' }}
+          style={{ flex: 1, width: '100%', minHeight: 0, background: '#1a1a2e' }}
         />
         {loading && (
           <div style={{
@@ -257,6 +345,23 @@ function GdsViewer() {
           }}>
             <p>Select a GDS file to view</p>
           </div>
+        )}
+        {selectedElement && drawerOpen && (
+          <ElementDrawer
+            elementIndex={selectedElement.index}
+            elementLayer={selectedElement.layer}
+            sourceLine={selectedElement.sourceLine}
+            sourceCall={selectedElement.sourceCall}
+            scriptPath={scriptPath}
+            onClose={() => {
+              if (selectedFeatureRef.current) {
+                selectedFeatureRef.current.setStyle(getStyle(selectedFeatureRef.current.get('layer')));
+              }
+              selectedFeatureRef.current = null;
+              setSelectedElement(null);
+              setDrawerOpen(false);
+            }}
+          />
         )}
       </div>
     </div>

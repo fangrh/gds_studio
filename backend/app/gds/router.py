@@ -1,3 +1,4 @@
+import json
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -9,10 +10,12 @@ from app.gds.schemas import (
     CellResponse, ElementResponse,
 )
 from app.gds.parser import parse_gds
+from app.gds.tracer import SOURCE_PROP_KEY
 
 router = APIRouter(prefix="/api/gds", tags=["gds"])
 
 GDS_DIR = os.environ.get("GDS_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "..", "gds"))
+PROJECTS_DIR = os.environ.get("GDS_PROJECTS_DIR", "/data/projects")
 
 
 @router.get("/scripts", response_model=list[ScriptResponse])
@@ -86,9 +89,9 @@ def list_gds_files():
 
 
 @router.get("/geometry/{gds_name:path}")
-def get_geometry(gds_name: str):
+def get_geometry(gds_name: str, db_session: Session = Depends(get_db)):
     """Parse a GDS file and return polygon geometry for rendering."""
-    import klayout.db as db
+    import klayout.db as kdb
 
     safe_name = os.path.basename(gds_name)
     gds_path = os.path.realpath(os.path.join(GDS_DIR, safe_name))
@@ -97,17 +100,39 @@ def get_geometry(gds_name: str):
     if not os.path.isfile(gds_path):
         raise HTTPException(404, f"GDS file not found: {safe_name}")
 
-    layout = db.Layout()
+    layout = kdb.Layout()
     layout.read(gds_path)
 
-    top_cell = layout.top_cell()
+    # Handle multiple top cells (gdsfactory creates one per component)
+    top_cells = layout.top_cells()
+    top_cell = top_cells[0] if top_cells else None
     if top_cell is None:
         raise HTTPException(400, "No top cell found")
+
+    # Look up build_id from DB by matching gds_path
+    build_id = None
+    script_path = None
+    build = db_session.query(GdsBuild).filter(
+        GdsBuild.gds_path.endswith("/" + safe_name)
+    ).order_by(GdsBuild.created_at.desc()).first()
+    if build:
+        build_id = build.id
+        script_path = build.script.path if build.script else None
+
+    # Derive script path from GDS filename if no DB record
+    if not script_path:
+        base_name = os.path.splitext(safe_name)[0]
+        candidate = os.path.join(GDS_DIR, "..", "scripts", base_name + ".py")
+        if os.path.isfile(candidate):
+            script_path = os.path.relpath(candidate, os.path.join(GDS_DIR, ".."))
 
     # Flatten into a single cell to get all geometry with transforms applied
     flat = layout.create_cell("flat")
     flat.copy_tree(top_cell)
     flat.flatten(False)
+
+    # Read source map from sidecar JSON file if it exists
+    source_map = _load_source_map(safe_name)
 
     layers = {}
     for li in range(layout.layers()):
@@ -137,17 +162,29 @@ def get_geometry(gds_name: str):
                     [box.left, box.bottom], [box.right, box.bottom],
                     [box.right, box.top], [box.left, box.top],
                 ]
+
+            # Use first source map entry for all elements (whole-file mapping)
+            source_line = None
+            source_call = None
+            if source_map:
+                source_line = source_map[0].get("line")
+                source_call = source_map[0].get("call")
+
             if verts:
-                elements.append({
+                el_dict = {
                     "type": "polygon",
                     "layer": layer_key,
                     "vertices": verts,
-                })
+                }
+                if source_line is not None:
+                    el_dict["source_line"] = source_line
+                    el_dict["source_call"] = source_call
+                elements.append(el_dict)
 
     bbox = flat.dbbox()
     layout.delete_cell(flat.cell_index())
 
-    return {
+    result = {
         "name": top_cell.name,
         "bbox": {
             "left": bbox.left, "bottom": bbox.bottom,
@@ -156,3 +193,83 @@ def get_geometry(gds_name: str):
         "layers": layers,
         "elements": elements,
     }
+    if build_id is not None:
+        result["build_id"] = build_id
+    if script_path is not None:
+        result["script_path"] = script_path
+    return result
+
+
+@router.get("/source")
+def get_source_context(
+    script_path: str = "",
+    source_line: int = 0,
+):
+    """Return source code context around a specific line in a script.
+
+    Used by the Code tab to show the Python code that generated a GDS element.
+    """
+    if not script_path or not source_line:
+        return {"error": "script_path and source_line required"}
+
+    safe_name = os.path.basename(script_path)
+
+    # Search locations: local scripts/ dir, then per-project sync dirs
+    search_roots = [
+        os.path.realpath(os.path.join(GDS_DIR, "..", "scripts")),
+    ]
+    if os.path.isdir(PROJECTS_DIR):
+        for entry in os.listdir(PROJECTS_DIR):
+            candidate = os.path.join(PROJECTS_DIR, entry, "scripts")
+            if os.path.isdir(candidate):
+                search_roots.append(os.path.realpath(candidate))
+
+    full_path = None
+    for root in search_roots:
+        candidate = os.path.realpath(os.path.join(root, safe_name))
+        if candidate.startswith(root) and os.path.isfile(candidate):
+            full_path = candidate
+            break
+
+    if not full_path:
+        return {"error": f"Script not found: {script_path}"}
+
+    with open(full_path) as f:
+        lines = f.readlines()
+
+    start = max(0, source_line - 11)  # 10 lines before
+    end = min(len(lines), source_line + 10)  # 10 lines after
+
+    snippet_lines = []
+    for i in range(start, end):
+        snippet_lines.append({
+            "num": i + 1,
+            "text": lines[i].rstrip("\n"),
+            "highlighted": i + 1 == source_line,
+        })
+
+    return {
+        "script_path": script_path,
+        "source_line": source_line,
+        "total_lines": len(lines),
+        "snippet_start": start + 1,
+        "snippet_end": end,
+        "snippet": snippet_lines,
+    }
+
+
+def _load_source_map(gds_name: str) -> list[dict] | None:
+    """Load source map from sidecar JSON file next to the GDS file.
+
+    The tracer writes a .source_map.json sidecar when building with tracing.
+    Format: [{"line": N, "fn": "...", "cls": "...", "call": "..."}, ...]
+    """
+    base = os.path.splitext(gds_name)[0]
+    sidecar = os.path.join(GDS_DIR, base + ".source_map.json")
+    if not os.path.isfile(sidecar):
+        return None
+    try:
+        with open(sidecar) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None

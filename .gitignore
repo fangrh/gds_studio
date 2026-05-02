@@ -9,3 +9,4 @@ dist/
 *.sqlite
 .superpowers/
 *.egg-info/
+.gstack/

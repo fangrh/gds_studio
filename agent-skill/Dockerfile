@@ -4,11 +4,9 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-RUN pip install --no-cache-dir -e .
+COPY pyproject.toml .
+COPY gds_collab_skill/ ./gds_collab_skill/
+RUN pip install --no-cache-dir .
 
 ENV GDS_COLLAB_API=http://backend:8000
 ENV GDS_SCRIPTS_DIR=/data/scripts

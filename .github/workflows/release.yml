@@ -9,11 +9,13 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
@@ -42,6 +44,29 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/frontend:${{ env.VERSION }}
             ghcr.io/${{ github.repository }}/frontend:latest
+
+      - name: Build and push agent-skill
+        uses: docker/build-push-action@v6
+        with:
+          context: ./agent-skill
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/agent-skill:${{ env.VERSION }}
+            ghcr.io/${{ github.repository }}/agent-skill:latest
+
+      - name: Update k8s manifests with release tag
+        run: |
+          sed -i "s|ghcr.io/${{ github.repository }}/backend:.*|ghcr.io/${{ github.repository }}/backend:${{ env.VERSION }}|" k8s/backend.yaml
+          sed -i "s|ghcr.io/${{ github.repository }}/frontend:.*|ghcr.io/${{ github.repository }}/frontend:${{ env.VERSION }}|" k8s/frontend.yaml
+          sed -i "s|ghcr.io/${{ github.repository }}/agent-skill:.*|ghcr.io/${{ github.repository }}/agent-skill:${{ env.VERSION }}|" k8s/agent-skill.yaml
+
+      - name: Commit updated manifests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/backend.yaml k8s/frontend.yaml k8s/agent-skill.yaml
+          git diff --cached --quiet || git commit -m "release: update image tags to v${{ env.VERSION }}"
+          git push
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

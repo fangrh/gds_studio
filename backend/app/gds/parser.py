@@ -1,8 +1,11 @@
 """Parse GDS files using klayout and extract cells, elements, layers."""
+import json
 from dataclasses import dataclass, field
 from typing import Optional
 
 import klayout.db as db
+
+SOURCE_PROP_KEY = 1001
 
 
 @dataclass
@@ -14,6 +17,9 @@ class ElementData:
     path_data: str = ""
     properties: dict = field(default_factory=dict)
     source_line: Optional[int] = None
+    source_function: Optional[str] = None
+    source_class: Optional[str] = None
+    source_call: Optional[str] = None
 
 
 @dataclass
@@ -81,6 +87,7 @@ def parse_gds(gds_path: str) -> GdsParseResult:
             layers_in_cell.add(li)
 
             for shape in shapes.each():
+                src = _read_source_meta(shape)
                 if shape.is_box():
                     box = shape.dbbox()
                     el = ElementData(
@@ -93,6 +100,7 @@ def parse_gds(gds_path: str) -> GdsParseResult:
                             [box.right, box.top],
                             [box.left, box.top],
                         ],
+                        **src,
                     )
                     cell_data.elements.append(el)
                 elif shape.is_polygon():
@@ -105,6 +113,7 @@ def parse_gds(gds_path: str) -> GdsParseResult:
                         layer=_layer_str(li, layout),
                         bbox=_bbox_str(shape.dbbox()),
                         vertices=verts,
+                        **src,
                     )
                     cell_data.elements.append(el)
                 elif shape.is_path():
@@ -112,6 +121,7 @@ def parse_gds(gds_path: str) -> GdsParseResult:
                         element_type="path",
                         layer=_layer_str(li, layout),
                         bbox=_bbox_str(shape.dbbox()),
+                        **src,
                     )
                     cell_data.elements.append(el)
                 elif shape.is_text():
@@ -119,6 +129,7 @@ def parse_gds(gds_path: str) -> GdsParseResult:
                         element_type="text",
                         layer=_layer_str(li, layout),
                         bbox=_bbox_str(shape.dbbox()),
+                        **src,
                     )
                     cell_data.elements.append(el)
 
@@ -137,3 +148,34 @@ def parse_gds(gds_path: str) -> GdsParseResult:
         result.cells.append(cell_data)
 
     return result
+
+
+def _read_source_meta(shape) -> dict:
+    """Read source metadata from a shape's GDS property (key 1001).
+
+    The tracer stores a JSON array of source entries or a single entry object.
+    For shapes in child cells, it's a single entry. For top-cell shapes, it's
+    the full source map (we use the first entry as the default).
+    """
+    raw = shape.property(SOURCE_PROP_KEY)
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+    if isinstance(data, list) and data:
+        # Full source map on top-cell shape — use first entry
+        entry = data[0]
+    elif isinstance(data, dict):
+        entry = data
+    else:
+        return {}
+
+    return {
+        "source_line": entry.get("line"),
+        "source_function": entry.get("fn"),
+        "source_class": entry.get("cls"),
+        "source_call": entry.get("call"),
+    }

@@ -71,3 +71,17 @@ class GdsCollabClient:
             scripts_dir = os.environ.get("GDS_SCRIPTS_DIR", "/data/scripts")
             with open(os.path.join(scripts_dir, script_path)) as f:
                 return f.read()
+
+    def get_source_context(self, script_path: str, source_line: int) -> dict | None:
+        """Get source code context around a specific line."""
+        try:
+            r = self._client.get(self._url(
+                f"/api/gds/source?script_path={script_path}&source_line={source_line}"
+            ))
+            r.raise_for_status()
+            data = r.json()
+            if data.get("error"):
+                return None
+            return data
+        except Exception:
+            return None

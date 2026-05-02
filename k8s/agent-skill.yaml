@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-skill
+  namespace: gds-collab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-skill
+  template:
+    metadata:
+      labels:
+        app: agent-skill
+    spec:
+      containers:
+        - name: agent-skill
+          image: ghcr.io/fangrh/gds_studio/agent-skill:staging
+          imagePullPolicy: Always
+          env:
+            - name: GDS_COLLAB_API
+              value: http://backend:8000
+            - name: GDS_SCRIPTS_DIR
+              value: /data/scripts
+            - name: GDS_GDS_DIR
+              value: /data/gds
+            - name: POLL_INTERVAL
+              value: "30"
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secrets
+                  key: anthropic-api-key
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: scripts
+              mountPath: /data/scripts
+              readOnly: true
+            - name: gds
+              mountPath: /data/gds
+              readOnly: true
+      volumes:
+        - name: scripts
+          persistentVolumeClaim:
+            claimName: scripts-pvc
+        - name: gds
+          persistentVolumeClaim:
+            claimName: gds-pvc

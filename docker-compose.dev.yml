@@ -21,5 +21,18 @@ services:
     depends_on:
       - backend
 
+  agent-skill:
+    build: ./agent-skill
+    environment:
+      - GDS_COLLAB_API=http://backend:8000
+      - GDS_SCRIPTS_DIR=/data/scripts
+      - GDS_GDS_DIR=/data/gds
+      - POLL_INTERVAL=30
+    volumes:
+      - ./data/scripts:/data/scripts:ro
+      - ./data/gds:/data/gds:ro
+    depends_on:
+      - backend
+
 volumes:
   db_data:

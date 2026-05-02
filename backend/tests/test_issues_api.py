@@ -83,3 +83,41 @@ async def test_list_issues_by_status(client):
 
     response = await client.get("/api/issues?status=resolved")
     assert len(response.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_list_issues_by_element_id(client):
+    await client.post("/api/issues", json={
+        "title": "Bend too tight",
+        "body": "Radius is 5um",
+        "linked_elements": [
+            {"element_id": 42, "cell_name": "ring_cell_1", "layer": "M1"}
+        ]
+    })
+    await client.post("/api/issues", json={
+        "title": "Gap too narrow",
+        "body": "Spacing violation",
+        "linked_elements": [
+            {"element_id": 42, "cell_name": "ring_cell_1", "layer": "M1"}
+        ]
+    })
+    await client.post("/api/issues", json={
+        "title": "Unrelated issue",
+        "body": "Different element",
+        "linked_elements": [
+            {"element_id": 99, "cell_name": "other_cell", "layer": "D1"}
+        ]
+    })
+
+    response = await client.get("/api/issues?element_id=42&cell_name=ring_cell_1")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert all(d["title"] in ("Bend too tight", "Gap too narrow") for d in data)
+
+
+@pytest.mark.asyncio
+async def test_list_issues_by_element_id_empty(client):
+    response = await client.get("/api/issues?element_id=999&cell_name=nope")
+    assert response.status_code == 200
+    assert response.json() == []

@@ -1,6 +1,15 @@
+from enum import Enum
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+
+
+class IssueStatus(str, Enum):
+    open = "open"
+    in_progress = "in_progress"
+    resolved = "resolved"
+    closed = "closed"
+    deleted = "deleted"
 
 
 class IssueElementLink(BaseModel):
@@ -60,7 +69,7 @@ class IssueCreate(BaseModel):
 class IssueUpdate(BaseModel):
     title: Optional[str] = None
     body: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[IssueStatus] = None
     priority: Optional[str] = None
     tags: Optional[list[str]] = None
 
