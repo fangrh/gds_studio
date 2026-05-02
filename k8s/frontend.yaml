@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/fangrh/gds_studio/frontend:sha-19351cc2db7ff970823e6e033b24242ba9118b34
+          image: ghcr.io/fangrh/gds_studio/frontend:sha-4396c63a8ad705105edef605419d495f22c76bc8
           imagePullPolicy: Always
           ports:
             - containerPort: 80
